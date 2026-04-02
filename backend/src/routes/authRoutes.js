@@ -3,19 +3,16 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const pool = require('../config/database');
+const { users } = require('../utils/memoryDb');
 
-// @route   POST /api/auth/register
-// @desc    Register user
-// @access  Public
+// Register
 router.post('/register',
   [
-    body('email').isEmail().withMessage('Please enter a valid email'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('fullName').notEmpty().withMessage('Full name is required')
+    body('email').isEmail(),
+    body('password').isLength({ min: 6 }),
+    body('fullName').notEmpty()
   ],
   async (req, res) => {
-    // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -25,12 +22,8 @@ router.post('/register',
 
     try {
       // Check if user exists
-      const userExists = await pool.query(
-        'SELECT * FROM users WHERE email = $1',
-        [email]
-      );
-
-      if (userExists.rows.length > 0) {
+      const existingUser = users.find(u => u.email === email);
+      if (existingUser) {
         return res.status(400).json({ message: 'User already exists' });
       }
 
@@ -39,18 +32,19 @@ router.post('/register',
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Create user
-      const result = await pool.query(
-        `INSERT INTO users (email, password_hash, full_name, user_type) 
-         VALUES ($1, $2, $3, $4) 
-         RETURNING id, email, full_name, user_type, created_at`,
-        [email, hashedPassword, fullName, userType]
-      );
-
-      const user = result.rows[0];
+      const newUser = {
+        id: users.length + 1,
+        email,
+        password_hash: hashedPassword,
+        full_name: fullName,
+        user_type: userType,
+        created_at: new Date()
+      };
+      users.push(newUser);
 
       // Create token
       const token = jwt.sign(
-        { id: user.id, email: user.email, user_type: user.user_type },
+        { id: newUser.id, email: newUser.email },
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -59,26 +53,24 @@ router.post('/register',
         success: true,
         token,
         user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.full_name,
-          userType: user.user_type
+          id: newUser.id,
+          email: newUser.email,
+          fullName: newUser.full_name,
+          userType: newUser.user_type
         }
       });
     } catch (error) {
       console.error('Registration error:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ message: 'Server error' });
     }
   }
 );
 
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
+// Login
 router.post('/login',
   [
-    body('email').isEmail().withMessage('Please enter a valid email'),
-    body('password').notEmpty().withMessage('Password is required')
+    body('email').isEmail(),
+    body('password').notEmpty()
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -89,17 +81,11 @@ router.post('/login',
     const { email, password } = req.body;
 
     try {
-      // Get user
-      const result = await pool.query(
-        'SELECT * FROM users WHERE email = $1',
-        [email]
-      );
-
-      if (result.rows.length === 0) {
+      // Find user
+      const user = users.find(u => u.email === email);
+      if (!user) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
-
-      const user = result.rows[0];
 
       // Check password
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
@@ -109,7 +95,7 @@ router.post('/login',
 
       // Create token
       const token = jwt.sign(
-        { id: user.id, email: user.email, user_type: user.user_type },
+        { id: user.id, email: user.email },
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -126,14 +112,12 @@ router.post('/login',
       });
     } catch (error) {
       console.error('Login error:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ message: 'Server error' });
     }
   }
 );
 
-// @route   GET /api/auth/verify
-// @desc    Verify token and get current user
-// @access  Private
+// Verify token
 router.get('/verify', async (req, res) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   
@@ -143,17 +127,11 @@ router.get('/verify', async (req, res) => {
   
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = users.find(u => u.id === decoded.id);
     
-    const result = await pool.query(
-      'SELECT id, email, full_name, user_type FROM users WHERE id = $1',
-      [decoded.id]
-    );
-    
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    const user = result.rows[0];
     
     res.json({
       valid: true,
@@ -165,11 +143,7 @@ router.get('/verify', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(401).json({ 
-      valid: false,
-      message: 'Invalid token',
-      error: err.message 
-    });
+    res.status(401).json({ valid: false, message: 'Invalid token' });
   }
 });
 
