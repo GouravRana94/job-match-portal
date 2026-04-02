@@ -10,24 +10,10 @@ import {
   Menu,
   MenuItem,
   Avatar,
-  useScrollTrigger,
-  Slide
+  Container
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import WorkIcon from '@mui/icons-material/Work';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PersonIcon from '@mui/icons-material/Person';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-
-function HideOnScroll(props) {
-  const { children, window } = props;
-  const trigger = useScrollTrigger({ target: window ? window() : undefined });
-  return (
-    <Slide appear={false} direction="down" in={!trigger}>
-      {children}
-    </Slide>
-  );
-}
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -49,125 +35,91 @@ const Navbar = () => {
   };
 
   return (
-    <HideOnScroll>
-      <AppBar 
-        position="sticky" 
-        elevation={0}
-        sx={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid rgba(0,0,0,0.05)',
-        }}
-      >
-        <Toolbar>
-          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-            <WorkIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography
-              variant="h6"
-              component={Link}
-              to="/"
-              sx={{
-                textDecoration: 'none',
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                color: 'transparent',
-                fontWeight: 700,
-              }}
-            >
+    <AppBar 
+      position="sticky" 
+      elevation={0}
+      sx={{
+        background: 'white',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
+      }}
+    >
+      <Container maxWidth="lg">
+        <Toolbar sx={{ px: { xs: 0 }, justifyContent: 'space-between' }}>
+          {/* Logo */}
+          <Box display="flex" alignItems="center" component={Link} to="/" sx={{ textDecoration: 'none' }}>
+            <WorkIcon sx={{ color: '#667eea', mr: 1 }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
               JobMatch Pro
             </Typography>
           </Box>
           
-          {isAuthenticated ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button 
-                color="inherit" 
-                component={Link} 
-                to="/"
-                startIcon={<DashboardIcon />}
-                sx={{ color: '#1e293b' }}
-              >
-                Dashboard
-              </Button>
-              <Button 
-                color="inherit" 
-                component={Link} 
-                to="/jobs"
-                startIcon={<WorkIcon />}
-                sx={{ color: '#1e293b' }}
-              >
-                Jobs
-              </Button>
-              <Button 
-                color="inherit" 
-                component={Link} 
-                to="/applications"
-                startIcon={<AssignmentIcon />}
-                sx={{ color: '#1e293b' }}
-              >
-                Apps
-              </Button>
-              <IconButton onClick={handleMenu} size="small">
-                <Avatar 
-                  sx={{ 
-                    bgcolor: 'primary.main',
-                    width: 40,
-                    height: 40,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'scale(1.05)',
+          {/* Navigation Links */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {isAuthenticated ? (
+              <>
+                <Button color="inherit" component={Link} to="/jobs" sx={{ color: '#4a5568' }}>
+                  Jobs
+                </Button>
+                <Button color="inherit" component={Link} to="/applications" sx={{ color: '#4a5568' }}>
+                  Applications
+                </Button>
+                <IconButton onClick={handleMenu} size="small">
+                  <Avatar sx={{ bgcolor: '#667eea', width: 35, height: 35 }}>
+                    {user?.fullName?.charAt(0) || 'U'}
+                  </Avatar>
+                </IconButton>
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      borderRadius: 2,
+                      minWidth: 180,
                     }
                   }}
                 >
-                  {user?.fullName?.charAt(0) || 'U'}
-                </Avatar>
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    borderRadius: 3,
-                    minWidth: 200,
-                  }
-                }}
-              >
-                <MenuItem component={Link} to="/profile" onClick={handleClose}>
-                  <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                  My Profile
-                </MenuItem>
-                <MenuItem onClick={handleLogout}>
-                  <Typography color="error">Logout</Typography>
-                </MenuItem>
-              </Menu>
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button 
-                variant="outlined" 
-                component={Link} 
-                to="/login"
-                sx={{ borderRadius: 3 }}
-              >
-                Login
-              </Button>
-              <Button 
-                variant="contained" 
-                component={Link} 
-                to="/register"
-                sx={{ borderRadius: 3 }}
-              >
-                Get Started
-              </Button>
-            </Box>
-          )}
+                  <MenuItem component={Link} to="/profile" onClick={handleClose}>
+                    My Profile
+                  </MenuItem>
+                  <MenuItem component={Link} to="/dashboard" onClick={handleClose}>
+                    Dashboard
+                  </MenuItem>
+                  <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+                    Logout
+                  </MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button 
+                  variant="text" 
+                  component={Link} 
+                  to="/login"
+                  sx={{ color: '#4a5568' }}
+                >
+                  Login
+                </Button>
+                <Button 
+                  variant="contained" 
+                  component={Link} 
+                  to="/register"
+                  sx={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%)',
+                    }
+                  }}
+                >
+                  Get Started
+                </Button>
+              </Box>
+            )}
+          </Box>
         </Toolbar>
-      </AppBar>
-    </HideOnScroll>
+      </Container>
+    </AppBar>
   );
 };
 

@@ -1,0 +1,8 @@
+# Add this file to ignore unnecessary files
+node_modules
+.git
+README.md
+.gitignore
+.env.local
+.env.development
+.env.test

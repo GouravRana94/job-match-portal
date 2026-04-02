@@ -10,7 +10,8 @@ import {
   Alert,
   CircularProgress,
   InputAdornment,
-  IconButton
+  IconButton,
+  Avatar
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,33 +55,47 @@ const Login = () => {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ 
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}>
+    <Box sx={{ 
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      py: 4
+    }}>
+      <Container maxWidth="sm">
         <motion.div
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={{ width: '100%' }}
         >
-          <Paper elevation={0} sx={{ p: 5, borderRadius: 4, backdropFilter: 'blur(10px)' }}>
-            <Box textAlign="center" mb={4}>
-              <WorkIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h4" gutterBottom fontWeight="bold">
-                Welcome Back
-              </Typography>
-              <Typography color="textSecondary">
-                Sign in to continue your job search
-              </Typography>
+          <Paper elevation={24} sx={{ 
+            p: { xs: 3, sm: 5 }, 
+            borderRadius: 4,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            {/* Logo/Icon */}
+            <Box display="flex" justifyContent="center" mb={3}>
+              <Avatar sx={{ 
+                width: 70, 
+                height: 70, 
+                bgcolor: 'primary.main',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              }}>
+                <WorkIcon sx={{ fontSize: 40 }} />
+              </Avatar>
             </Box>
             
+            <Typography variant="h4" align="center" gutterBottom fontWeight="bold">
+              Welcome Back
+            </Typography>
+            <Typography variant="body2" align="center" color="textSecondary" sx={{ mb: 4 }}>
+              Sign in to continue your job search journey
+            </Typography>
+            
             {error && (
-              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                 {error}
               </Alert>
             )}
@@ -136,22 +151,30 @@ const Login = () => {
                 variant="contained"
                 size="large"
                 disabled={loading}
-                sx={{ mt: 4, mb: 2, py: 1.5 }}
+                sx={{ 
+                  mt: 4, 
+                  mb: 2, 
+                  py: 1.5,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%)',
+                  }
+                }}
               >
-                {loading ? <CircularProgress size={24} /> : 'Sign In'}
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
               </Button>
               
-              <Typography align="center">
+              <Typography variant="body2" align="center">
                 Don't have an account?{' '}
-                <Link to="/register" style={{ textDecoration: 'none', fontWeight: 600 }}>
+                <Link to="/register" style={{ textDecoration: 'none', fontWeight: 600, color: '#667eea' }}>
                   Create Account
                 </Link>
               </Typography>
             </form>
           </Paper>
         </motion.div>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 
