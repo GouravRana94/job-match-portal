@@ -4,13 +4,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// In-memory storage (no database needed!)
+// In-memory storage
 const users = [];
 const profiles = [];
 const jobs = [
@@ -25,38 +25,41 @@ const applications = [];
 // Auth middleware
 const auth = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'No token provided' });
+  if (!token) return res.status(401).json({ error: 'No token provided' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
     req.user = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid token' });
   }
 };
 
+// ============ PUBLIC ROUTES ============
+
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', message: 'Server is running', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', message: 'Server is running', timestamp: new Date().toISOString() });
 });
 
 // Root
 app.get('/', (req, res) => {
-  res.json({ message: 'Job Match Portal API', version: '2.0' });
+  res.json({ message: 'Job Match Portal API', version: '2.0', endpoints: ['/api/auth/register', '/api/auth/login', '/api/jobs', '/api/health'] });
 });
 
 // Register
 app.post('/api/auth/register', async (req, res) => {
+  console.log('📝 Register endpoint hit');
   try {
     const { email, password, fullName, userType = 'seeker' } = req.body;
-    console.log('📝 Registration attempt:', email);
+    console.log('Register data:', { email, fullName, userType });
     
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password required' });
+      return res.status(400).json({ error: 'Email and password required' });
     }
     
     if (users.find(u => u.email === email)) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ error: 'User already exists' });
     }
     
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -64,7 +67,7 @@ app.post('/api/auth/register', async (req, res) => {
       id: users.length + 1,
       email,
       password_hash: hashedPassword,
-      full_name: fullName,
+      full_name: fullName || email.split('@')[0],
       user_type: userType,
       created_at: new Date()
     };
@@ -89,24 +92,25 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
+  console.log('🔐 Login endpoint hit');
   try {
     const { email, password } = req.body;
-    console.log('🔐 Login attempt:', email);
+    console.log('Login data:', { email });
     
     const user = users.find(u => u.email === email);
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
     
     const isValid = await bcrypt.compare(password, user.password_hash);
     if (!isValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
     
     const token = jwt.sign(
@@ -128,16 +132,13 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
 // Verify token
 app.get('/api/auth/verify', auth, (req, res) => {
   const user = users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
-  }
   res.json({
     valid: true,
     user: {
@@ -149,11 +150,12 @@ app.get('/api/auth/verify', auth, (req, res) => {
   });
 });
 
+// ============ PROTECTED ROUTES ============
+
 // Get profile
 app.get('/api/profile', auth, (req, res) => {
   const user = users.find(u => u.id === req.user.id);
-  let profile = profiles.find(p => p.user_id === req.user.id);
-  
+  const profile = profiles.find(p => p.user_id === req.user.id);
   res.json({
     id: user.id,
     email: user.email,
@@ -165,9 +167,9 @@ app.get('/api/profile', auth, (req, res) => {
 
 // Update profile
 app.put('/api/profile', auth, (req, res) => {
-  const { skills, experience_years, education, resume_text, current_title, preferred_location } = req.body;
-  
+  const { skills, experience_years, education, resume_text } = req.body;
   let profile = profiles.find(p => p.user_id === req.user.id);
+  
   if (!profile) {
     profile = { id: profiles.length + 1, user_id: req.user.id };
     profiles.push(profile);
@@ -177,148 +179,75 @@ app.put('/api/profile', auth, (req, res) => {
   profile.experience_years = experience_years || 0;
   profile.education = education || '';
   profile.resume_text = resume_text || '';
-  profile.current_title = current_title || '';
-  profile.preferred_location = preferred_location || '';
-  profile.updated_at = new Date();
   
-  res.json({ success: true, message: 'Profile updated', profile });
+  res.json({ success: true, profile });
 });
 
-// Get all jobs
+// Get jobs
 app.get('/api/jobs', auth, (req, res) => {
-  const { title, location } = req.query;
-  let filteredJobs = jobs.filter(j => j.is_active);
-  
-  if (title) {
-    filteredJobs = filteredJobs.filter(j => j.title.toLowerCase().includes(title.toLowerCase()));
-  }
-  if (location) {
-    filteredJobs = filteredJobs.filter(j => j.location.toLowerCase().includes(location.toLowerCase()));
-  }
-  
-  res.json({ jobs: filteredJobs });
+  res.json({ jobs: jobs.filter(j => j.is_active) });
 });
 
 // Get single job
 app.get('/api/jobs/:id', auth, (req, res) => {
   const job = jobs.find(j => j.id === parseInt(req.params.id));
-  if (!job) {
-    return res.status(404).json({ message: 'Job not found' });
-  }
   res.json({ job });
 });
 
 // Apply for job
 app.post('/api/applications', auth, (req, res) => {
-  const { job_id, notes } = req.body;
+  const { job_id } = req.body;
   const profile = profiles.find(p => p.user_id === req.user.id);
   
   if (!profile) {
-    return res.status(400).json({ message: 'Please complete your profile first' });
+    return res.status(400).json({ error: 'Complete your profile first' });
   }
   
   const existing = applications.find(a => a.user_id === req.user.id && a.job_id === job_id);
   if (existing) {
-    return res.status(400).json({ message: 'Already applied for this job' });
+    return res.status(400).json({ error: 'Already applied' });
   }
   
   const application = {
     id: applications.length + 1,
     user_id: req.user.id,
     job_id,
-    notes,
     status: 'pending',
     applied_date: new Date()
   };
   applications.push(application);
   
-  res.status(201).json({ success: true, message: 'Application submitted', application });
+  res.status(201).json({ success: true, application });
 });
 
-// Get user applications
+// Get applications
 app.get('/api/applications', auth, (req, res) => {
   const userApps = applications.filter(a => a.user_id === req.user.id);
-  const appsWithJobs = userApps.map(app => ({
-    ...app,
-    title: jobs.find(j => j.id === app.job_id)?.title,
-    company: jobs.find(j => j.id === app.job_id)?.company
-  }));
-  
-  res.json({ applications: appsWithJobs, total: appsWithJobs.length });
+  res.json({ applications: userApps });
 });
 
-// Get dashboard stats
+// Dashboard stats
 app.get('/api/profile/stats', auth, (req, res) => {
   const userApps = applications.filter(a => a.user_id === req.user.id);
-  res.json({
-    total_applications: userApps.length,
-    response_rate: 0,
-    active_applications: userApps.filter(a => a.status === 'pending').length
-  });
+  res.json({ total_applications: userApps.length });
 });
 
-// Get top matches
+// Top matches
 app.get('/api/matches/top', auth, (req, res) => {
-  const profile = profiles.find(p => p.user_id === req.user.id);
-  if (!profile) {
-    return res.json([]);
-  }
-  
-  const matches = jobs.map(job => {
-    let matchScore = 50;
-    if (profile.skills) {
-      const matchingSkills = profile.skills.filter(s => 
-        job.requirements.some(r => r.toLowerCase().includes(s.toLowerCase()))
-      );
-      matchScore = 50 + Math.min(45, (matchingSkills.length / job.requirements.length) * 45);
-    }
-    return {
-      job_id: job.id,
-      title: job.title,
-      company: job.company,
-      match_score: Math.round(matchScore),
-      location: job.location
-    };
-  }).sort((a, b) => b.match_score - a.match_score).slice(0, 5);
-  
-  res.json(matches);
+  const matches = jobs.map(j => ({ ...j, match_score: Math.floor(Math.random() * 40) + 60 }));
+  res.json(matches.slice(0, 5));
 });
 
 // Generate matches
-app.post('/api/matches/generate', auth, async (req, res) => {
-  const profile = profiles.find(p => p.user_id === req.user.id);
-  if (!profile) {
-    return res.status(400).json({ message: 'Complete your profile first' });
-  }
-  
-  const matches = jobs.map(job => {
-    let matchScore = 50;
-    if (profile.skills) {
-      const matchingSkills = profile.skills.filter(s => 
-        job.requirements.some(r => r.toLowerCase().includes(s.toLowerCase()))
-      );
-      matchScore = 50 + Math.min(45, (matchingSkills.length / job.requirements.length) * 45);
-    }
-    return {
-      job_id: job.id,
-      title: job.title,
-      company: job.company,
-      match_score: Math.round(matchScore),
-      match_details: {
-        matching_skills: profile.skills?.filter(s => 
-          job.requirements.some(r => r.toLowerCase().includes(s.toLowerCase()))
-        ) || [],
-        match_level: matchScore >= 80 ? 'Excellent' : matchScore >= 60 ? 'Good' : 'Potential'
-      }
-    };
-  }).sort((a, b) => b.match_score - a.match_score);
-  
-  res.json({ success: true, matches, total: matches.length });
+app.post('/api/matches/generate', auth, (req, res) => {
+  const matches = jobs.map(j => ({ ...j, match_score: Math.floor(Math.random() * 40) + 60 }));
+  res.json({ success: true, matches });
 });
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📍 API URL: https://job-match-portal-api.onrender.com`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📍 Health: https://job-match-portal-api.onrender.com/api/health`);
+  console.log(`📍 Register: POST /api/auth/register`);
+  console.log(`📍 Login: POST /api/auth/login`);
 });
