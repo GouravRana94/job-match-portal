@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: job-match-portal-api
+    runtime: node
+    repo: https://github.com/GouravRana94/job-match-portal
+    plan: free
+    region: oregon
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://job-match-portal-5b25-neon.vercel.app
