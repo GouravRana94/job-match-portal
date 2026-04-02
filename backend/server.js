@@ -6,128 +6,80 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// 🔥 Deployment marker (VERY IMPORTANT)
-console.log("🔥 STANDALONE SERVER ACTIVE - NO DB 🔥");
-
 app.use(cors());
 app.use(express.json());
 
-// In-memory store
 const users = [];
 
-// Root route
 app.get('/', (req, res) => {
   res.json({ message: 'Job Match API is running!', status: 'ok' });
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Register
 app.post('/api/auth/register', async (req, res) => {
+  console.log('Register:', req.body.email);
   try {
-    console.log('Register BODY:', req.body);
-
-    if (!req.body) {
-      return res.status(400).json({ error: 'Request body missing' });
-    }
-
     const { email, password, fullName } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const existingUser = users.find(u => u.email === email);
-    if (existingUser) {
+    if (users.find(u => u.email === email)) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
+    const hashed = await bcrypt.hash(password, 10);
     const user = {
       id: users.length + 1,
       email,
-      password: hashedPassword,
+      password: hashed,
       name: fullName || email.split('@')[0]
     };
 
     users.push(user);
 
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || 'my_secret',
-      { expiresIn: '7d' }
-    );
+    const token = jwt.sign({ userId: user.id }, 'my_secret', { expiresIn: '7d' });
 
-    return res.status(201).json({
+    res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.name
-      }
+      user: { id: user.id, email, fullName: user.name }
     });
 
   } catch (err) {
-    console.error('REGISTER ERROR:', err);
-    return res.status(500).json({
-      message: 'Server error',
-      error: err.message
-    });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
+  console.log('Login:', req.body.email);
   try {
-    console.log('Login BODY:', req.body);
-
-    if (!req.body) {
-      return res.status(400).json({ error: 'Request body missing' });
-    }
-
     const { email, password } = req.body;
 
     const user = users.find(u => u.email === email);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || 'my_secret',
-      { expiresIn: '7d' }
-    );
+    const token = jwt.sign({ userId: user.id }, 'my_secret', { expiresIn: '7d' });
 
-    return res.json({
+    res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.name
-      }
+      user: { id: user.id, email, fullName: user.name }
     });
 
   } catch (err) {
-    console.error('LOGIN ERROR:', err);
-    return res.status(500).json({
-      message: 'Server error',
-      error: err.message
-    });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Jobs
 app.get('/api/jobs', (req, res) => {
   const jobs = [
     { id: 1, title: "React Developer", company: "TechCorp", location: "Remote" },
@@ -136,18 +88,6 @@ app.get('/api/jobs', (req, res) => {
   res.json({ jobs });
 });
 
-// 404 handler (important)
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-// Global error handler (important)
-app.use((err, req, res, next) => {
-  console.error('GLOBAL ERROR:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log("🔥 FINAL STANDALONE SERVER RUNNING 🔥");
 });
