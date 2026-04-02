@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: jobmatch
+      POSTGRES_USER: jobmatch_user
+      POSTGRES_PASSWORD: jobmatch123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/models/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobmatch_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: postgres
+      DB_USER: jobmatch_user
+      DB_PASSWORD: jobmatch123
+      DB_NAME: jobmatch
+      DB_PORT: 5432
+      JWT_SECRET: your_super_secret_jwt_key
+      ML_SERVICE_URL: http://ml-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: postgres
+      DB_USER: jobmatch_user
+      DB_PASSWORD: jobmatch123
+      DB_NAME: jobmatch
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./ml-service:/app
+
+volumes:
+  postgres_data:
