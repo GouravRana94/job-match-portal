@@ -9,21 +9,22 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Simple in-memory storage (no database!)
+// In-memory storage
 const users = [];
 
-// Basic routes
-app.get('/', (req, res) => {
-  res.json({ message: 'Job Match API is running!' });
-});
-
+// Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Register - This is what you need
+// Root
+app.get('/', (req, res) => {
+  res.json({ message: 'Job Match API is live!' });
+});
+
+// Register
 app.post('/api/auth/register', async (req, res) => {
-  console.log('📝 Register request:', req.body);
+  console.log('Register:', req.body);
   try {
     const { email, password, fullName } = req.body;
     
@@ -35,22 +36,21 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
     
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = {
+    const hashed = await bcrypt.hash(password, 10);
+    const user = {
       id: users.length + 1,
       email,
-      password: hashedPassword,
+      password: hashed,
       name: fullName || email.split('@')[0]
     };
-    users.push(newUser);
+    users.push(user);
     
-    const token = jwt.sign({ userId: newUser.id }, 'my_secret_key', { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, 'mysecret', { expiresIn: '7d' });
     
-    console.log('✅ User registered:', email);
     res.json({
       success: true,
       token,
-      user: { id: newUser.id, email, fullName: newUser.name }
+      user: { id: user.id, email, fullName: user.name }
     });
   } catch (err) {
     console.error('Error:', err);
@@ -60,21 +60,17 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
-  console.log('🔐 Login request:', req.body.email);
+  console.log('Login:', req.body.email);
   try {
     const { email, password } = req.body;
     const user = users.find(u => u.email === email);
     
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     
-    const token = jwt.sign({ userId: user.id }, 'my_secret_key', { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, 'mysecret', { expiresIn: '7d' });
     
     res.json({
       success: true,
@@ -86,17 +82,19 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Simple jobs endpoint
+// Jobs endpoint
 app.get('/api/jobs', (req, res) => {
   const jobs = [
-    { id: 1, title: "React Developer", company: "TechCorp", location: "Remote", requirements: ["React", "JS"], salary: "$80k" },
-    { id: 2, title: "Python Developer", company: "DataSys", location: "Remote", requirements: ["Python", "Django"], salary: "$90k" }
+    { id: 1, title: "React Developer", company: "TechCorp", location: "Remote", requirements: ["React", "JavaScript"], salary: "$80k-$100k" },
+    { id: 2, title: "Python Developer", company: "DataSys", location: "Remote", requirements: ["Python", "Django"], salary: "$90k-$110k" },
+    { id: 3, title: "Full Stack Developer", company: "StartupInc", location: "SF", requirements: ["React", "Node.js"], salary: "$100k-$130k" }
   ];
   res.json({ jobs });
 });
 
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📍 Health: https://job-match-portal-api.onrender.com/api/health`);
+  console.log(`📍 Health: /api/health`);
   console.log(`📍 Register: POST /api/auth/register`);
 });
